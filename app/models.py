@@ -1,0 +1,71 @@
+from django.db import models
+from django.utils.text import slugify
+
+
+class Artist(models.Model):
+    name = models.CharField(max_length=255, blank=True)
+    bio = models.TextField(blank=True, null=True)
+    profile_picture = models.ImageField(upload_to="artists/", blank=True, null=True)
+    banner = models.ImageField(upload_to="artists/", blank=True, null=True)   
+    views = models.IntegerField(default=0, blank=True, null=True)
+
+    slug = models.SlugField(blank=True, unique=True)
+    yt_id = models.CharField(blank=True, null=True)
+    
+    def save(self, *args, **kwargs):
+        # generate slug only if not set
+        if not self.slug:
+            base_slug = slugify(self.name)
+            slug = base_slug
+            i = 1
+            # ensure slug uniqueness
+            while Artist.objects.filter(slug=slug).exists():
+                slug = f"{base_slug}-{i}"
+                i += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+
+class Album(models.Model):
+    title = models.CharField(max_length=255)
+    cover = models.ImageField(upload_to="albums/", blank=True, null=True)
+    track_count = models.IntegerField(default=0, blank=True, null=True)
+    release_date = models.DateField(blank=True, null=True)
+
+    slug = models.SlugField(blank=True, null=True)
+    artist = models.ManyToManyField(Artist, related_name="albums")
+
+    yt_id = models.CharField(blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        # generate slug only if not set
+        if not self.slug:
+            base_slug = slugify(self.title)
+            slug = base_slug
+            i = 1
+            # ensure slug uniqueness
+            while Artist.objects.filter(slug=slug).exists():
+                slug = f"{base_slug}-{i}"
+                i += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        if self.artist.first():
+            return f"{self.title} (" + self.artist.first().name + ")"
+        else:
+            return f"{self.title}"
+
+class Track(models.Model):
+    title = models.CharField(max_length=255)
+    order = models.IntegerField(default=0, blank=True)
+    duration = models.IntegerField(default=0, blank=True, null=True)
+
+    album = models.ForeignKey(Album, on_delete=models.CASCADE, related_name="tracks")
+    featured_artists = models.ManyToManyField(Artist)
+
+    yt_id = models.CharField(blank=True, null=True)
+

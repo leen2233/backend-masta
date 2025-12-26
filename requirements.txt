@@ -4,3 +4,4 @@ django-jazzmin
 djangorestframework
 drf-yasg
 python-dotenv
+yt-dlp

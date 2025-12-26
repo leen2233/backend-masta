@@ -2,10 +2,10 @@ import sys
 import os
 import django
 import argparse
+import logging
 from ytmusicapi import YTMusic
 from django.db.models import Q
 from datetime import date
-import pprint
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'masta.settings')
@@ -15,6 +15,12 @@ from app.models import Artist, Album, Track
 from workers.helpers import download_and_save_image
 
 ytmusic = YTMusic()
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 
 parser = argparse.ArgumentParser(description="Update metadata")
@@ -36,7 +42,10 @@ if args.album:
 
 artists_to_fetch = Artist.objects.filter(query)
 
+logger.info(f"Found {artists_to_fetch.count()} artists to update metadata")
+
 for artist in artists_to_fetch:
+    logger.debug(f"Processing artist with id: {artist.yt_id}")
     try:
         metadata = ytmusic.get_artist(artist.yt_id)
     except:
@@ -51,18 +60,20 @@ for artist in artists_to_fetch:
     artist.save()
 
     # update albums
+    logger.debug("Saving albums of artist {artist.name}")
     for album in metadata.get("albums", {"results": []}).get("results"):
         if not Album.objects.filter(yt_id=album.get("browseId")).exists():
             album_obj = Album.objects.create(
                     title=album.get("title"),
                     yt_id=album.get("browseId"),
-                    release_date=date(int(album.get("type")), 1, 1) # because type is presents actually year, it is misnamed at ytmusicapi package
+                    release_date=date(int(album.get("type")), 1, 1) # because type is actually presents year, it is misnamed at ytmusicapi package
             )
             download_and_save_image(album_obj.cover, album.get("thumbnails", [{}])[-1].get("url"))
             album_obj.save()
             album_obj.artist.add(artist)
     
     # create Single album
+    logger.debug("Saving singles of artist {artist.name}")
     if metadata.get("singles", {}).get("browseId") and args.tracks:
         browseId = metadata.get("singles").get("browseId")
         params = metadata.get("singles", {}).get("params")
@@ -78,9 +89,11 @@ for artist in artists_to_fetch:
             album.save()
             album.artist.add(artist)
         
+logger.info("Completed updating artists metadata")
 
 if args.tracks:
     albums = Album.objects.filter(tracks__isnull=True)
+    logger.info(f"Found {albums.count()} albums with no tracks. Starting...")
     for album in albums:
         metadata = ytmusic.get_album(album.yt_id)
         album.title = metadata.get("title")
@@ -108,4 +121,6 @@ if args.tracks:
                     artist, created = Artist.objects.get_or_create(yt_id=artist.get("id"), defaults={"name": artist.get("name")})
                     if artist not in track_obj.featured_artists.all():
                         track_obj.featured_artists.add(artist)
+        logger.debug(f"Completed updating album {album.title}, with track count: {album.track_count}")
+    logger.info("Completed updating tracks metadata")
 

@@ -57,11 +57,12 @@ if args.name or args.banner or args.album:
 
         artist.name = metadata.get("name")
         artist.bio = metadata.get("description")
+        artist.save()
+
         if len(metadata.get("thumbnails")) > 0 and (artist.banner.name == "" or artist.banner is None):
             url = metadata.get("thumbnails", [{}])[1].get("url")
             download_and_save_image(artist.banner, url)
 
-        artist.save()
 
         if artist.parse_tracks:
             # update albums
@@ -71,11 +72,12 @@ if args.name or args.banner or args.album:
                     album_obj = Album.objects.create(
                             title=album.get("title"),
                             yt_id=album.get("browseId"),
-                            release_date=date(int(album.get("type")), 1, 1) # because type is actually presents year, it is misnamed at ytmusicapi package
+                            release_date=date(int(album.get("type")), 1, 1), # because type is actually presents year, it is misnamed at ytmusicapi package
+                            artist=artist
                     )
-                    download_and_save_image(album_obj.cover, album.get("thumbnails", [{}])[-1].get("url"))
                     album_obj.save()
-                    album_obj.artist.add(artist)
+
+                    download_and_save_image(album_obj.cover, album.get("thumbnails", [{}])[-1].get("url"))
             
             # create Single album
             logger.debug("Saving singles of artist {artist.name}")
@@ -88,11 +90,11 @@ if args.name or args.banner or args.album:
                             title=single.get("title"),
                             type=single.get("type").lower(),
                             yt_id=single.get("browseId"),
-                            release_date=date(int(single.get("year")), 1, 1)
+                            release_date=date(int(single.get("year")), 1, 1),
+                            artist=artist
                     )
-                    download_and_save_image(album.cover, single.get("thumbnails", [{}])[-1].get("url"))
                     album.save()
-                    album.artist.add(artist)
+                    download_and_save_image(album.cover, single.get("thumbnails", [{}])[-1].get("url"))
         else:
             logger.debug(f"Passing artist {artist.name}, because parse_tracks is False")
             
@@ -127,13 +129,11 @@ if args.tracks:
         metadata = ytmusic.get_album(album.yt_id)
         album.title = metadata.get("title")
         album.track_count = int(metadata.get("trackCount", 0))
-        
+        album.save()
+
         if album.cover.name == "" or album.cover is None:
             download_and_save_image(album.cover, metadata.get("thumbnails", [{}])[-1].get("url"))
         
-        album.save()
-        artist_names = list(album.artist.all().values_list("name", flat=True))
-
         for track in metadata.get("tracks", []):
             track_obj, created = Track.objects.get_or_create(
                     yt_id=track.get("videoId"),
@@ -146,7 +146,7 @@ if args.tracks:
             )
 
             for artist in track.get("artists"):
-                if artist.get("id") and artist.get("name") not in artist_names:
+                if artist.get("id") and artist.get("name") != album.artist.name:
                     artist, created = Artist.objects.get_or_create(
                             yt_id=artist.get("id"), 
                             defaults={

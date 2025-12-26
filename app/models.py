@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.text import slugify
+import os
 
 
 class Genre(models.Model):
@@ -10,11 +11,29 @@ class Genre(models.Model):
         return self.name
 
 
+def artist_image_path(instance, filename):
+    ext = filename.split('.')[-1]
+    return os.path.join("music", instance.name, f"folder.{ext}")
+
+def album_cover_path(instance, filename):
+    ext = filename.split('.')[-1]
+    return os.path.join("music", instance.artist.name, instance.title, f"cover.{ext}")
+
+def track_file_path(instance, filename):
+    ext = filename.split('.')[-1]
+    return os.path.join(
+            "music",
+            instance.album.artist.name,
+            instance.album.title,
+            f"{instance.order}. {instance.title}.{ext}"
+    )
+
+
 class Artist(models.Model):
     name = models.CharField(max_length=255, blank=True)
     bio = models.TextField(blank=True, null=True)
     profile_picture = models.ImageField(upload_to="artists/", blank=True, null=True)
-    banner = models.ImageField(upload_to="artists/", blank=True, null=True)   
+    banner = models.ImageField(upload_to=artist_image_path, blank=True, null=True) 
     views = models.IntegerField(default=0, blank=True, null=True)
 
     parse_tracks = models.BooleanField(default=True)
@@ -46,13 +65,13 @@ class Album(models.Model):
         EP      =  ("ep", "EP")
 
     title = models.CharField(max_length=255)
-    cover = models.ImageField(upload_to="albums/", blank=True, null=True)
+    cover = models.ImageField(upload_to=album_cover_path, blank=True, null=True)
     track_count = models.IntegerField(default=0, blank=True, null=True)
     release_date = models.DateField(blank=True, null=True)
     type = models.CharField(max_length=10, choices=Types, default="album")
 
     slug = models.SlugField(blank=True, null=True)
-    artist = models.ManyToManyField(Artist, related_name="albums")
+    artist = models.ForeignKey(Artist, related_name="albums", on_delete=models.CASCADE)
 
     yt_id = models.CharField(blank=True, null=True)
 
@@ -70,8 +89,8 @@ class Album(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        if self.artist.first():
-            return f"{self.title} (" + self.artist.first().name + ")"
+        if self.artist:
+            return f"{self.title} (" + self.artist.name + ")"
         else:
             return f"{self.title}"
 
@@ -83,6 +102,6 @@ class Track(models.Model):
     album = models.ForeignKey(Album, on_delete=models.CASCADE, related_name="tracks")
     featured_artists = models.ManyToManyField(Artist)
 
-    file = models.FileField(upload_to="tracks/", blank=True, null=True)
+    file = models.FileField(upload_to=track_file_path, blank=True, null=True)
     yt_id = models.CharField(blank=True, null=True)
 

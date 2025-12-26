@@ -30,10 +30,16 @@ class Artist(models.Model):
 
 
 class Album(models.Model):
+    class Types(models.TextChoices):
+        SINGLE  =  ("single", "Single")
+        ALBUM   =  ("album", "Album")
+        EP      =  ("ep", "EP")
+
     title = models.CharField(max_length=255)
     cover = models.ImageField(upload_to="albums/", blank=True, null=True)
     track_count = models.IntegerField(default=0, blank=True, null=True)
     release_date = models.DateField(blank=True, null=True)
+    type = models.CharField(max_length=10, choices=Types, default="album")
 
     slug = models.SlugField(blank=True, null=True)
     artist = models.ManyToManyField(Artist, related_name="albums")
@@ -67,5 +73,6 @@ class Track(models.Model):
     album = models.ForeignKey(Album, on_delete=models.CASCADE, related_name="tracks")
     featured_artists = models.ManyToManyField(Artist)
 
+    file = models.FileField(upload_to="tracks/", blank=True, null=True)
     yt_id = models.CharField(blank=True, null=True)
 

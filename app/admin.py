@@ -3,6 +3,11 @@ from django.contrib import admin
 from .models import Artist, Album, Track
 
 
+class TrackInline(admin.TabularInline):
+    model = Track
+    extra = 0
+
+
 @admin.register(Artist)
 class ArtistAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "slug", "bio")
@@ -11,7 +16,8 @@ class ArtistAdmin(admin.ModelAdmin):
 
 @admin.register(Album)
 class AlbumAdmin(admin.ModelAdmin):
-    list_display = ("id", "title", "track_count", "release_date")
+    list_display = ("id", "title", "type", "track_count", "release_date")
+    inlines = [TrackInline]
 
 
 @admin.register(Track)

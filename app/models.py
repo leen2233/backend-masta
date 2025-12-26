@@ -2,6 +2,14 @@ from django.db import models
 from django.utils.text import slugify
 
 
+class Genre(models.Model):
+    name = models.CharField(max_length=255)
+    icon = models.ImageField(upload_to="genres/", blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Artist(models.Model):
     name = models.CharField(max_length=255, blank=True)
     bio = models.TextField(blank=True, null=True)
@@ -9,6 +17,8 @@ class Artist(models.Model):
     banner = models.ImageField(upload_to="artists/", blank=True, null=True)   
     views = models.IntegerField(default=0, blank=True, null=True)
 
+    parse_tracks = models.BooleanField(default=True)
+    genres = models.ManyToManyField(Genre)
     slug = models.SlugField(blank=True, unique=True)
     yt_id = models.CharField(blank=True, null=True)
     

@@ -63,35 +63,38 @@ if args.name or args.banner or args.album:
 
         artist.save()
 
-        # update albums
-        logger.debug("Saving albums of artist {artist.name}")
-        for album in metadata.get("albums", {"results": []}).get("results"):
-            if not Album.objects.filter(yt_id=album.get("browseId")).exists():
-                album_obj = Album.objects.create(
-                        title=album.get("title"),
-                        yt_id=album.get("browseId"),
-                        release_date=date(int(album.get("type")), 1, 1) # because type is actually presents year, it is misnamed at ytmusicapi package
-                )
-                download_and_save_image(album_obj.cover, album.get("thumbnails", [{}])[-1].get("url"))
-                album_obj.save()
-                album_obj.artist.add(artist)
-        
-        # create Single album
-        logger.debug("Saving singles of artist {artist.name}")
-        if metadata.get("singles", {}).get("browseId") and args.tracks:
-            browseId = metadata.get("singles").get("browseId")
-            params = metadata.get("singles", {}).get("params")
-            singles = ytmusic.get_artist_albums(browseId, params)
-            for single in singles:
-                album = Album.objects.create(
-                        title=single.get("title"),
-                        type=single.get("type").lower(),
-                        yt_id=single.get("browseId"),
-                        release_date=date(int(single.get("year")), 1, 1)
-                )
-                download_and_save_image(album.cover, single.get("thumbnails", [{}])[-1].get("url"))
-                album.save()
-                album.artist.add(artist)
+        if artist.parse_tracks:
+            # update albums
+            logger.debug(f"Saving albums of artist {artist.name}")
+            for album in metadata.get("albums", {"results": []}).get("results"):
+                if not Album.objects.filter(yt_id=album.get("browseId")).exists():
+                    album_obj = Album.objects.create(
+                            title=album.get("title"),
+                            yt_id=album.get("browseId"),
+                            release_date=date(int(album.get("type")), 1, 1) # because type is actually presents year, it is misnamed at ytmusicapi package
+                    )
+                    download_and_save_image(album_obj.cover, album.get("thumbnails", [{}])[-1].get("url"))
+                    album_obj.save()
+                    album_obj.artist.add(artist)
+            
+            # create Single album
+            logger.debug("Saving singles of artist {artist.name}")
+            if metadata.get("singles", {}).get("browseId") and args.tracks:
+                browseId = metadata.get("singles").get("browseId")
+                params = metadata.get("singles", {}).get("params")
+                singles = ytmusic.get_artist_albums(browseId, params)
+                for single in singles:
+                    album = Album.objects.create(
+                            title=single.get("title"),
+                            type=single.get("type").lower(),
+                            yt_id=single.get("browseId"),
+                            release_date=date(int(single.get("year")), 1, 1)
+                    )
+                    download_and_save_image(album.cover, single.get("thumbnails", [{}])[-1].get("url"))
+                    album.save()
+                    album.artist.add(artist)
+        else:
+            logger.debug(f"Passing artist {artist.name}, because parse_tracks is False")
             
     logger.info("Completed updating artists metadata")
 
@@ -144,7 +147,13 @@ if args.tracks:
 
             for artist in track.get("artists"):
                 if artist.get("id") and artist.get("name") not in artist_names:
-                    artist, created = Artist.objects.get_or_create(yt_id=artist.get("id"), defaults={"name": artist.get("name")})
+                    artist, created = Artist.objects.get_or_create(
+                            yt_id=artist.get("id"), 
+                            defaults={
+                                "name": artist.get("name"),
+                                "parse_tracks": False
+                            }
+                    )
                     if artist not in track_obj.featured_artists.all():
                         track_obj.featured_artists.add(artist)
         logger.debug(f"Completed updating album {album.title}, with track count: {album.track_count}")

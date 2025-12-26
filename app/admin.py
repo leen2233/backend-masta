@@ -1,12 +1,14 @@
 from django.contrib import admin
 
-from .models import Artist, Album, Track
+from .models import Artist, Album, Track, Genre
 
 
 class TrackInline(admin.TabularInline):
     model = Track
     extra = 0
 
+
+admin.site.register(Genre)
 
 @admin.register(Artist)
 class ArtistAdmin(admin.ModelAdmin):

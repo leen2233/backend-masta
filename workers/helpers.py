@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 from django.conf import settings
 import os
 import uuid
+from mutagen.oggopus import OggOpus
 
 
 def download_and_save_image(obj, url):
@@ -44,4 +45,16 @@ def save_artist_nfo(artist):
     with open(path, "w") as f:
         f.write(content)
 
+
+def write_metadata(filepath, track):
+    audio = OggOpus(filepath)
+
+    # basic required tags
+    audio["title"] = track.title
+    audio["artist"] = track.album.artist.name
+    audio["album"] = track.album.title
+    audio["albumartist"] = track.album.artist.name
+    audio["tracknumber"] = str(track.order)
+
+    audio.save()
 

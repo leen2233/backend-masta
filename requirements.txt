@@ -5,3 +5,4 @@ djangorestframework
 drf-yasg
 python-dotenv
 yt-dlp
+mutagen

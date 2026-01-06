@@ -14,7 +14,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'masta.settings')
 django.setup()
 
 from app.models import Artist, Album, Track
-from workers.helpers import download_and_save_image
+from workers.helpers import download_and_save_image, save_artist_nfo
 
 ytmusic = YTMusic()
 logging.basicConfig(
@@ -42,7 +42,7 @@ if args.name or args.banner or args.album:
         query &= Q(banner__isnull=True) | Q(banner="")
 
     if args.album:
-        query &= Q(albums__isnull=True)
+        query &= Q(albums__isnull=True, parse_tracks=True)
 
     artists_to_fetch = Artist.objects.filter(query)
 
@@ -58,6 +58,9 @@ if args.name or args.banner or args.album:
         artist.name = metadata.get("name")
         artist.bio = metadata.get("description")
         artist.save()
+
+        # save metadata to nfo file
+        save_artist_nfo(artist)
 
         if len(metadata.get("thumbnails")) > 0 and (artist.banner.name == "" or artist.banner is None):
             url = metadata.get("thumbnails", [{}])[1].get("url")
@@ -80,7 +83,7 @@ if args.name or args.banner or args.album:
                     download_and_save_image(album_obj.cover, album.get("thumbnails", [{}])[-1].get("url"))
             
             # create Single album
-            logger.debug("Saving singles of artist {artist.name}")
+            logger.debug(f"Saving singles of artist {artist.name}")
             if metadata.get("singles", {}).get("browseId") and args.tracks:
                 browseId = metadata.get("singles").get("browseId")
                 params = metadata.get("singles", {}).get("params")

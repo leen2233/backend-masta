@@ -41,8 +41,13 @@ ydl_opts = {
 }
 
 for track in tracks:
+    logging.debug(f"Downloading track: {track.album.artist.name} - {track.title}")
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(track.yt_id, download=True)
+
+        if not info:
+            logging.error(f"Couldn't download track: {track.album.artist.name} - {track.title}")
+            continue
 
         filepath = info["requested_downloads"][0]["filepath"]
 

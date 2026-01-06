@@ -41,8 +41,11 @@ def save_artist_nfo(artist):
     for genre in artist.genres.all():
         genres += f"\n    <genre>{genre.name}</genre>"
     content = ARTIST_NFO_TEMPLATE.format(name=artist.name, genres=genres, bio=artist.bio)
-    path = os.path.join(settings.BASE_DIR, settings.MEDIA_ROOT, "music", artist.name, "artist.nfo")
-    with open(path, "w") as f:
+    path = os.path.join(settings.BASE_DIR, settings.MEDIA_ROOT, "music", artist.name)
+    if not os.path.isdir(path):
+        os.makedirs(path, exist_ok=True)
+    file = os.path.join(path, "artist.nfo")
+    with open(file, "w") as f:
         f.write(content)
 
 
@@ -51,7 +54,13 @@ def write_metadata(filepath, track):
 
     # basic required tags
     audio["title"] = track.title
-    audio["artist"] = track.album.artist.name
+    if track.featured_artists.count() > 0:
+        artists = track.album.artist.name
+        for feat_art in track.featured_artists.all():
+            artists += f";{feat_art.name}"
+        audio["artists"] = artists
+    else:
+        audio["artist"] = track.album.artist.name
     audio["album"] = track.album.title
     audio["albumartist"] = track.album.artist.name
     audio["tracknumber"] = str(track.order)

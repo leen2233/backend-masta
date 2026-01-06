@@ -11,9 +11,13 @@ class Genre(models.Model):
         return self.name
 
 
-def artist_image_path(instance, filename):
+def artist_profile_picture_path(instance, filename):
     ext = filename.split('.')[-1]
     return os.path.join("music", instance.name, f"folder.{ext}")
+
+def artist_banner_path(instance, filename):
+    ext = filename.split('.')[-1]
+    return os.path.join("music", instance.name, f"backdrop.{ext}")
 
 def album_cover_path(instance, filename):
     ext = filename.split('.')[-1]
@@ -32,8 +36,8 @@ def track_file_path(instance, filename):
 class Artist(models.Model):
     name = models.CharField(max_length=255, blank=True)
     bio = models.TextField(blank=True, null=True)
-    profile_picture = models.ImageField(upload_to="artists/", blank=True, null=True)
-    banner = models.ImageField(upload_to=artist_image_path, blank=True, null=True) 
+    profile_picture = models.ImageField(upload_to=artist_profile_picture_path, blank=True, null=True)
+    banner = models.ImageField(upload_to=artist_banner_path, blank=True, null=True) 
     views = models.IntegerField(default=0, blank=True, null=True)
 
     parse_tracks = models.BooleanField(default=True)
@@ -100,7 +104,7 @@ class Track(models.Model):
     duration = models.IntegerField(default=0, blank=True, null=True)
 
     album = models.ForeignKey(Album, on_delete=models.CASCADE, related_name="tracks")
-    featured_artists = models.ManyToManyField(Artist)
+    featured_artists = models.ManyToManyField(Artist, blank=True)
 
     listens = models.IntegerField(default=0)
     file = models.FileField(upload_to=track_file_path, blank=True, null=True)

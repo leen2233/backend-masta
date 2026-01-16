@@ -24,6 +24,6 @@ class AlbumAdmin(admin.ModelAdmin):
 
 @admin.register(Track)
 class TrackAdmin(admin.ModelAdmin):
-    list_display = ("id", "title", "album__title")
+    list_display = ("id", "title", "album")
     search_fields = ("title", "album__title", "album__artist__name")
 

@@ -37,13 +37,18 @@ class Artist(models.Model):
     name = models.CharField(max_length=255, blank=True)
     bio = models.TextField(blank=True, null=True)
     profile_picture = models.ImageField(upload_to=artist_profile_picture_path, blank=True, null=True)
-    banner = models.ImageField(upload_to=artist_banner_path, blank=True, null=True) 
+    banner = models.ImageField(upload_to=artist_banner_path, blank=True, null=True)
     views = models.IntegerField(default=0, blank=True, null=True)
 
     parse_tracks = models.BooleanField(default=True)
     genres = models.ManyToManyField(Genre)
     slug = models.SlugField(blank=True, unique=True)
-    yt_id = models.CharField(blank=True, null=True)
+    yt_id = models.CharField(blank=True, null=True, max_length=255)
+
+    # Frontend integration fields
+    followers = models.IntegerField(default=0, blank=True, null=True)
+    monthly_listeners = models.IntegerField(default=0, blank=True, null=True)
+    verified = models.BooleanField(default=False)
     
     def save(self, *args, **kwargs):
         # generate slug only if not set
@@ -77,7 +82,7 @@ class Album(models.Model):
     slug = models.SlugField(blank=True, null=True)
     artist = models.ForeignKey(Artist, related_name="albums", on_delete=models.CASCADE)
 
-    yt_id = models.CharField(blank=True, null=True)
+    yt_id = models.CharField(blank=True, null=True, max_length=255)
 
     def save(self, *args, **kwargs):
         # generate slug only if not set
@@ -108,5 +113,5 @@ class Track(models.Model):
 
     listens = models.IntegerField(default=0)
     file = models.FileField(upload_to=track_file_path, blank=True, null=True)
-    yt_id = models.CharField(blank=True, null=True)
+    yt_id = models.CharField(blank=True, null=True, max_length=255)
 

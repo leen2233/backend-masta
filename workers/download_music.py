@@ -45,11 +45,15 @@ for track in tracks:
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(track.yt_id, download=True)
 
-        if not info:
+        if not info or not info.get("requested_downloads"):
             logging.error(f"Couldn't download track: {track.album.artist.name} - {track.title}")
             continue
 
-        filepath = info["requested_downloads"][0]["filepath"]
+        downloads = info.get("requested_downloads")[0]
+        if not downloads.get("filepath"):
+            logging.error(f"Couldn't download track: {track.album.artist.name} - {track.title}")
+            continue
+        filepath = downloads.get("filepath")
 
         # write metadata to file
         write_metadata(filepath, track)

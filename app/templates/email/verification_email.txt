@@ -1,0 +1,17 @@
+MASTA - Email Verification
+========================
+
+Welcome to Masta!
+
+Hello {{ user.username }},
+
+Thank you for registering. Please verify your email address by clicking the link below:
+
+{{ verification_url }}
+
+This link will expire in 24 hours.
+
+If you didn't create an account, you can safely ignore this email.
+
+---
+Masta - Your music streaming service

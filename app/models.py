@@ -1,6 +1,94 @@
 from django.db import models
 from django.utils.text import slugify
+from django.contrib.auth.models import User
 import os
+import secrets
+
+
+class UserProfile(models.Model):
+    """Extended user profile with additional fields"""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+
+    # Additional fields
+    email_verified = models.BooleanField(default=False)
+    avatar = models.URLField(blank=True, null=True)
+    date_of_birth = models.DateField(blank=True, null=True)
+
+    # OAuth fields
+    oauth_provider = models.CharField(max_length=50, blank=True, null=True)
+    oauth_uid = models.CharField(max_length=255, blank=True, null=True)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username}'s profile"
+
+    class Meta:
+        verbose_name = 'User Profile'
+        verbose_name_plural = 'User Profiles'
+
+
+class EmailVerificationToken(models.Model):
+    """Token for email verification"""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='verification_tokens')
+    token = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if not self.token:
+            self.token = secrets.token_urlsafe(32)
+        super().save(*args, **kwargs)
+
+    def is_valid(self):
+        from django.utils import timezone
+        return not self.is_used and timezone.now() < self.expires_at
+
+    def __str__(self):
+        return f"Token for {self.user.email}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['token']),
+            models.Index(fields=['user', 'is_used']),
+        ]
+        verbose_name = 'Email Verification Token'
+        verbose_name_plural = 'Email Verification Tokens'
+
+
+class PasswordResetToken(models.Model):
+    """Token for password reset"""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reset_tokens')
+    token = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if not self.token:
+            self.token = secrets.token_urlsafe(32)
+        super().save(*args, **kwargs)
+
+    def is_valid(self):
+        from django.utils import timezone
+        return not self.is_used and timezone.now() < self.expires_at
+
+    def __str__(self):
+        return f"Password reset token for {self.user.email}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['token']),
+            models.Index(fields=['user', 'is_used']),
+        ]
+        verbose_name = 'Password Reset Token'
+        verbose_name_plural = 'Password Reset Tokens'
 
 
 class Genre(models.Model):

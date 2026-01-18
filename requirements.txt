@@ -6,3 +6,9 @@ drf-yasg
 python-dotenv
 yt-dlp
 mutagen
+
+# Authentication
+djangorestframework-simplejwt==5.3.1
+django-allauth==0.60.1
+dj-rest-auth==5.0.2
+PyJWT==2.8.0

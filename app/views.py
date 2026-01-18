@@ -11,7 +11,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from django.db.models import Q, Count
 from django.contrib.auth import get_user_model
 
-from .models import Genre, Artist, Track, Album
+from .models import Genre, Artist, Track, Album, ListeningHistory, UserPreferences, NotificationPreference
 from .serializers import (
     GenreSerializer,
     ArtistSerializer,
@@ -22,11 +22,14 @@ from .serializers import (
     TrackSerializer,
     TrackDetailSerializer,
     UserSerializer,
+    UserSettingsSerializer,
     RegisterSerializer,
     CustomTokenObtainPairSerializer,
     ChangePasswordSerializer,
     UpdateProfileSerializer,
     ResetPasswordSerializer,
+    ListeningHistorySerializer,
+    AvatarUploadSerializer,
 )
 from .services.email_service import EmailService
 
@@ -203,7 +206,19 @@ def logout_view(request):
 @permission_classes([IsAuthenticated])
 def me_view(request):
     """Get current authenticated user"""
-    serializer = UserSerializer(request.user)
+    user = request.user
+
+    # Ensure preferences and notifications exist for the user
+    try:
+        _ = user.preferences
+    except UserPreferences.DoesNotExist:
+        UserPreferences.objects.create(user=user)
+    try:
+        _ = user.notification_preferences
+    except NotificationPreference.DoesNotExist:
+        NotificationPreference.objects.create(user=user)
+
+    serializer = UserSerializer(user, context={"request": request})
     return Response(serializer.data)
 
 
@@ -321,3 +336,125 @@ def reset_password_view(request):
     EmailService.mark_password_reset_token_used(token)
 
     return Response({'message': 'Password reset successfully'})
+
+
+# =============================================================================
+# Settings Views
+# =============================================================================
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def settings_view(request):
+    """
+    GET: Retrieve user settings including profile, preferences, and notifications
+    PATCH: Update user settings
+    """
+    user = request.user
+
+    # Ensure preferences and notifications exist for the user
+    try:
+        _ = user.preferences
+    except UserPreferences.DoesNotExist:
+        UserPreferences.objects.create(user=user)
+    try:
+        _ = user.notification_preferences
+    except NotificationPreference.DoesNotExist:
+        NotificationPreference.objects.create(user=user)
+
+    if request.method == 'GET':
+        serializer = UserSettingsSerializer(user)
+        return Response(serializer.data)
+
+    elif request.method == 'PATCH':
+        serializer = UserSettingsSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_avatar_view(request):
+    """Upload or update user avatar"""
+    serializer = AvatarUploadSerializer(data=request.data)
+    if serializer.is_valid():
+        avatar = serializer.validated_data['avatar']
+        # Save avatar file path - Django's ImageField will handle the storage
+        request.user.profile.avatar = avatar
+        request.user.profile.save()
+        # Refresh from DB to get the stored file path (not the InMemoryUploadedFile)
+        request.user.profile.refresh_from_db()
+        # Build the URL - avatar.name contains the path relative to MEDIA_ROOT
+        avatar_url = request.build_absolute_uri(request.user.profile.avatar.url)
+        return Response({'avatar': request.user.profile.avatar.name, 'avatar_url': avatar_url})
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_account_view(request):
+    """Permanently delete user account"""
+    user = request.user
+    # Logout user first by blacklisting refresh token
+    try:
+        refresh_token = request.data.get('refresh')
+        if refresh_token:
+            from rest_framework_simplejwt.tokens import RefreshToken
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+    except:
+        pass
+
+    # Delete user (this will cascade delete profile, preferences, etc.)
+    user.delete()
+    return Response({'message': 'Account deleted successfully'}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def download_data_view(request):
+    """Export user data as JSON"""
+    user = request.user
+    user_serializer = UserSettingsSerializer(user)
+
+    # Get listening history
+    history = ListeningHistory.objects.filter(user=user)
+    history_serializer = ListeningHistorySerializer(history, many=True)
+
+    data = {
+        'user': user_serializer.data,
+        'listening_history': history_serializer.data,
+        'exported_at': timezone.now().isoformat()
+    }
+
+    response = Response(data, content_type='application/json')
+    response['Content-Disposition'] = 'attachment; filename="masta_user_data.json"'
+    return response
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def clear_history_view(request):
+    """Clear all listening history for the user"""
+    user = request.user
+    deleted_count = ListeningHistory.objects.filter(user=user).delete()[0]
+    return Response({
+        'message': f'{deleted_count} listening history entries cleared'
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def listening_history_view(request):
+    """Get user's listening history"""
+    user = request.user
+    history = ListeningHistory.objects.filter(user=user).select_related(
+        'track__album__artist'
+    )[:100]  # Limit to last 100 entries
+    serializer = ListeningHistorySerializer(history, many=True)
+    return Response(serializer.data)
+
+
+# Import timezone for download_data_view
+from django.utils import timezone

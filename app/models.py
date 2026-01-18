@@ -12,7 +12,7 @@ class UserProfile(models.Model):
 
     # Additional fields
     email_verified = models.BooleanField(default=False)
-    avatar = models.URLField(blank=True, null=True)
+    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
     date_of_birth = models.DateField(blank=True, null=True)
 
     # OAuth fields
@@ -202,4 +202,81 @@ class Track(models.Model):
     listens = models.IntegerField(default=0)
     file = models.FileField(upload_to=track_file_path, blank=True, null=True)
     yt_id = models.CharField(blank=True, null=True, max_length=255)
+
+
+# =============================================================================
+# User Settings Models
+# =============================================================================
+
+class UserPreferences(models.Model):
+    """User preferences for playback and privacy settings"""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='preferences')
+
+    # Playback settings
+    crossfade_duration = models.IntegerField(default=0, help_text="Crossfade duration in seconds (0-12)")
+    gapless_playback = models.BooleanField(default=True, help_text="Enable gapless playback between tracks")
+
+    # Privacy settings
+    private_account = models.BooleanField(default=False, help_text="Only approved followers can see your activity")
+    show_activity_status = models.BooleanField(default=True, help_text="Let others see when you're listening")
+    share_listening_history = models.BooleanField(default=True, help_text="Used for personalized recommendations")
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username}'s preferences"
+
+    class Meta:
+        verbose_name = 'User Preferences'
+        verbose_name_plural = 'User Preferences'
+
+
+class NotificationPreference(models.Model):
+    """User notification preferences"""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='notification_preferences')
+
+    # Email notifications
+    email_new_releases = models.BooleanField(default=True, help_text="New releases from followed artists")
+    email_recommendations = models.BooleanField(default=True, help_text="Weekly music recommendations")
+
+    # In-app notifications
+    app_playlist_updates = models.BooleanField(default=True, help_text="When playlists you follow are updated")
+    app_friend_activity = models.BooleanField(default=False, help_text="When friends share music or playlists")
+    app_concert_alerts = models.BooleanField(default=False, help_text="Concert announcements near you")
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username}'s notifications"
+
+    class Meta:
+        verbose_name = 'Notification Preference'
+        verbose_name_plural = 'Notification Preferences'
+
+
+class ListeningHistory(models.Model):
+    """Track listening history for users"""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='listening_history')
+    track = models.ForeignKey(Track, on_delete=models.CASCADE, related_name='listening_history')
+    played_at = models.DateTimeField(auto_now_add=True)
+    play_duration = models.IntegerField(default=0, help_text="Duration played in seconds")
+
+    def __str__(self):
+        return f"{self.user.username} - {self.track.title}"
+
+    class Meta:
+        ordering = ['-played_at']
+        indexes = [
+            models.Index(fields=['user', '-played_at']),
+            models.Index(fields=['track', '-played_at']),
+        ]
+        verbose_name = 'Listening History'
+        verbose_name_plural = 'Listening History'
 

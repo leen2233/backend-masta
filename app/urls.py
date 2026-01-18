@@ -19,6 +19,13 @@ from .views import (
     change_password_view,
     request_password_reset_view,
     reset_password_view,
+    # Settings views
+    settings_view,
+    upload_avatar_view,
+    delete_account_view,
+    download_data_view,
+    clear_history_view,
+    listening_history_view,
 )
 
 urlpatterns = [
@@ -34,6 +41,14 @@ urlpatterns = [
     path("auth/change-password/", change_password_view, name="change_password"),
     path("auth/request-password-reset/", request_password_reset_view, name="request_password_reset"),
     path("auth/reset-password/", reset_password_view, name="reset_password"),
+
+    # Settings endpoints
+    path("settings/", settings_view, name="settings"),
+    path("settings/avatar/", upload_avatar_view, name="upload_avatar"),
+    path("settings/delete-account/", delete_account_view, name="delete_account"),
+    path("settings/download-data/", download_data_view, name="download_data"),
+    path("settings/clear-history/", clear_history_view, name="clear_history"),
+    path("settings/listening-history/", listening_history_view, name="listening_history"),
 
     # Music endpoints
     path("genres/", GenreListView.as_view()),

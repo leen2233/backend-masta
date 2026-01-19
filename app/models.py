@@ -157,15 +157,15 @@ class Artist(models.Model):
 
 class Album(models.Model):
     class Types(models.TextChoices):
-        SINGLE  =  ("single", "Single")
-        ALBUM   =  ("album", "Album")
-        EP      =  ("ep", "EP")
+        SINGLE  = "single", "Single"
+        ALBUM   = "album", "Album"
+        EP      = "ep", "EP"
 
     title = models.CharField(max_length=255)
     cover = models.ImageField(upload_to=album_cover_path, blank=True, null=True)
     track_count = models.IntegerField(default=0, blank=True, null=True)
     release_date = models.DateField(blank=True, null=True)
-    type = models.CharField(max_length=10, choices=Types, default="album")
+    type = models.CharField(max_length=10, choices=Types.choices, default="album")
 
     slug = models.SlugField(blank=True, null=True)
     artist = models.ForeignKey(Artist, related_name="albums", on_delete=models.CASCADE)
@@ -277,6 +277,63 @@ class ListeningHistory(models.Model):
             models.Index(fields=['user', '-played_at']),
             models.Index(fields=['track', '-played_at']),
         ]
-        verbose_name = 'Listening History'
-        verbose_name_plural = 'Listening History'
 
+
+class SavedAlbum(models.Model):
+    """User's saved albums for library"""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='saved_albums')
+    album = models.ForeignKey(Album, on_delete=models.CASCADE, related_name='saved_by')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Saved Album'
+        verbose_name_plural = 'Saved Albums'
+        unique_together = ['user', 'album']  # Prevent duplicate saves
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.album.title}"
+
+
+class FollowedArtist(models.Model):
+    """Artists that user follows"""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='followed_artists')
+    artist = models.ForeignKey(Artist, on_delete=models.CASCADE, related_name='followed_by_users')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Followed Artist'
+        verbose_name_plural = 'Followed Artists'
+        unique_together = ['user', 'artist']  # Prevent duplicate follows
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} follows {self.artist.name}"
+
+
+class FavoriteTrack(models.Model):
+    """User's favorite (liked) tracks"""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorite_tracks')
+    track = models.ForeignKey(Track, on_delete=models.CASCADE, related_name='favorited_by')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Favorite Track'
+        verbose_name_plural = 'Favorite Tracks'
+        unique_together = ['user', 'track']  # Prevent duplicate favorites
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.track.title}"

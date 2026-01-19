@@ -8,10 +8,10 @@ from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Sum
 from django.contrib.auth import get_user_model
 
-from .models import Genre, Artist, Track, Album, ListeningHistory, UserPreferences, NotificationPreference
+from .models import Genre, Artist, Track, Album, ListeningHistory, UserPreferences, NotificationPreference, SavedAlbum, FollowedArtist, FavoriteTrack
 from .serializers import (
     GenreSerializer,
     ArtistSerializer,
@@ -29,6 +29,10 @@ from .serializers import (
     UpdateProfileSerializer,
     ResetPasswordSerializer,
     ListeningHistorySerializer,
+    UserStatsSerializer,
+    SavedAlbumSerializer,
+    FollowedArtistSerializer,
+    FavoriteTrackSerializer,
     AvatarUploadSerializer,
 )
 from .services.email_service import EmailService
@@ -454,6 +458,195 @@ def listening_history_view(request):
     )[:100]  # Limit to last 100 entries
     serializer = ListeningHistorySerializer(history, many=True)
     return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_stats_view(request):
+    """Get user listening statistics"""
+    user = request.user
+
+    # Get listening history
+    history = ListeningHistory.objects.filter(user=user)
+
+    # Calculate stats
+    tracks_played = history.count()
+
+    # Sum play duration and convert to hours
+    total_duration = history.aggregate(total=Sum('play_duration'))['total'] or 0
+    hours_streamed = round(total_duration / 3600, 1)
+
+    # Count distinct artists from listening history
+    artists_discovered = history.values('track__album__artist').distinct().count()
+
+    # Placeholder for playlists (to be implemented later)
+    playlists_created = 0
+
+    data = {
+        'tracks_played': tracks_played,
+        'hours_streamed': hours_streamed,
+        'playlists_created': playlists_created,
+        'artists_discovered': artists_discovered,
+    }
+
+    serializer = UserStatsSerializer(data)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def track_play_view(request, pk):
+    """Track when a user plays a track - creates listening history entry"""
+    user = request.user
+
+    try:
+        track = Track.objects.get(pk=pk)
+    except Track.DoesNotExist:
+        return Response({'error': 'Track not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Create listening history entry
+    ListeningHistory.objects.create(
+        user=user,
+        track=track,
+        play_duration=0  # Will be updated if duration tracking is added later
+    )
+
+    # Increment track listen count
+    track.listens = (track.listens or 0) + 1
+    track.save(update_fields=['listens'])
+
+    return Response({'message': 'Play tracked'}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def saved_albums_view(request):
+    """Get user's saved albums"""
+    user = request.user
+    saved_albums = SavedAlbum.objects.filter(user=user).select_related('album__artist').order_by('-created_at')
+    serializer = SavedAlbumSerializer(saved_albums, many=True, context={'request': request})
+    return Response(serializer.data)
+
+
+@api_view(['POST', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def save_album_view(request, pk):
+    """Save or unsave an album"""
+    user = request.user
+
+    try:
+        album = Album.objects.get(pk=pk)
+    except Album.DoesNotExist:
+        return Response({'error': 'Album not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'POST':
+        # Save album (create if doesn't exist)
+        saved_album, created = SavedAlbum.objects.get_or_create(
+            user=user,
+            album=album
+        )
+        if created:
+            return Response({'message': 'Album saved'}, status=status.HTTP_201_CREATED)
+        else:
+            return Response({'message': 'Album already saved'}, status=status.HTTP_200_OK)
+
+    elif request.method == 'DELETE':
+        # Unsave album
+        deleted_count, _ = SavedAlbum.objects.filter(user=user, album=album).delete()
+        if deleted_count > 0:
+            return Response({'message': 'Album removed from library'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'Album not in library'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def followed_artists_view(request):
+    """Get user's followed artists"""
+    user = request.user
+    followed = FollowedArtist.objects.filter(user=user).select_related('artist').order_by('-created_at')
+    serializer = FollowedArtistSerializer(followed, many=True, context={'request': request})
+    return Response(serializer.data)
+
+
+@api_view(['POST', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def follow_artist_view(request, pk):
+    """Follow or unfollow an artist"""
+    user = request.user
+
+    try:
+        artist = Artist.objects.get(pk=pk)
+    except Artist.DoesNotExist:
+        return Response({'error': 'Artist not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'POST':
+        # Follow artist (create if doesn't exist)
+        followed_artist, created = FollowedArtist.objects.get_or_create(
+            user=user,
+            artist=artist
+        )
+        if created:
+            # Increment artist followers count
+            artist.followers = (artist.followers or 0) + 1
+            artist.save(update_fields=['followers'])
+            return Response({'message': 'Artist followed'}, status=status.HTTP_201_CREATED)
+        else:
+            return Response({'message': 'Already following this artist'}, status=status.HTTP_200_OK)
+
+    elif request.method == 'DELETE':
+        # Unfollow artist
+        deleted_count, _ = FollowedArtist.objects.filter(user=user, artist=artist).delete()
+        if deleted_count > 0:
+            # Decrement artist followers count
+            artist.followers = max(0, (artist.followers or 0) - 1)
+            artist.save(update_fields=['followers'])
+            return Response({'message': 'Artist unfollowed'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'Not following this artist'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def favorite_tracks_view(request):
+    """Get user's favorite (liked) tracks"""
+    user = request.user
+    favorites = FavoriteTrack.objects.filter(user=user).select_related(
+        'track__album__artist'
+    ).order_by('-created_at')
+    serializer = FavoriteTrackSerializer(favorites, many=True, context={'request': request})
+    return Response(serializer.data)
+
+
+@api_view(['POST', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def favorite_track_view(request, pk):
+    """Like or unlike a track"""
+    user = request.user
+
+    try:
+        track = Track.objects.get(pk=pk)
+    except Track.DoesNotExist:
+        return Response({'error': 'Track not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'POST':
+        # Like track (create if doesn't exist)
+        favorite, created = FavoriteTrack.objects.get_or_create(
+            user=user,
+            track=track
+        )
+        if created:
+            return Response({'message': 'Track liked'}, status=status.HTTP_201_CREATED)
+        else:
+            return Response({'message': 'Already liked'}, status=status.HTTP_200_OK)
+
+    elif request.method == 'DELETE':
+        # Unlike track
+        deleted_count, _ = FavoriteTrack.objects.filter(user=user, track=track).delete()
+        if deleted_count > 0:
+            return Response({'message': 'Track unliked'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'Track not in favorites'}, status=status.HTTP_404_NOT_FOUND)
 
 
 # Import timezone for download_data_view

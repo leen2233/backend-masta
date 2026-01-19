@@ -26,6 +26,15 @@ from .views import (
     download_data_view,
     clear_history_view,
     listening_history_view,
+    user_stats_view,
+    track_play_view,
+    # Library views
+    saved_albums_view,
+    save_album_view,
+    followed_artists_view,
+    follow_artist_view,
+    favorite_tracks_view,
+    favorite_track_view,
 )
 
 urlpatterns = [
@@ -49,6 +58,7 @@ urlpatterns = [
     path("settings/download-data/", download_data_view, name="download_data"),
     path("settings/clear-history/", clear_history_view, name="clear_history"),
     path("settings/listening-history/", listening_history_view, name="listening_history"),
+    path("settings/stats/", user_stats_view, name="user_stats"),
 
     # Music endpoints
     path("genres/", GenreListView.as_view()),
@@ -57,5 +67,14 @@ urlpatterns = [
     path("albums/", AlbumListView.as_view()),
     path("albums/<slug:slug>/", AlbumDetailView.as_view()),
     path("tracks/", TrackListView.as_view()),
+    path("tracks/<int:pk>/play/", track_play_view, name="track_play"),
     path("search/", SearchView.as_view()),
+
+    # Library endpoints
+    path("library/saved-albums/", saved_albums_view, name="saved_albums"),
+    path("library/saved-albums/<int:pk>/", save_album_view, name="save_album"),
+    path("library/followed-artists/", followed_artists_view, name="followed_artists"),
+    path("library/followed-artists/<int:pk>/", follow_artist_view, name="follow_artist"),
+    path("library/favorite-tracks/", favorite_tracks_view, name="favorite_tracks"),
+    path("library/favorite-tracks/<int:pk>/", favorite_track_view, name="favorite_track"),
 ]

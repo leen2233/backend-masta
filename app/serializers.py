@@ -5,7 +5,7 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.conf import settings
 
-from .models import Genre, Artist, Track, Album, UserProfile, UserPreferences, NotificationPreference, ListeningHistory
+from .models import Genre, Artist, Track, Album, UserProfile, UserPreferences, NotificationPreference, ListeningHistory, SavedAlbum, FollowedArtist, FavoriteTrack
 
 User = get_user_model()
 
@@ -18,10 +18,20 @@ class GenreSerializer(ModelSerializer):
 
 class ArtistSerializer(ModelSerializer):
     genres = GenreSerializer(many=True, read_only=True)
+    image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Artist
         fields = "__all__"
+
+    def get_image_url(self, obj):
+        """Get the absolute URL for the artist profile picture"""
+        if obj.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile_picture.url)
+            return obj.profile_picture.url
+        return None
 
 
 class AlbumSerializer(ModelSerializer):
@@ -35,10 +45,24 @@ class AlbumSerializer(ModelSerializer):
 class TrackSerializer(ModelSerializer):
     """Track serializer with nested album and artist data"""
     album = AlbumSerializer()
+    artist = SerializerMethodField()
+    audioUrl = serializers.SerializerMethodField()
 
     class Meta:
         model = Track
         fields = "__all__"
+
+    def get_artist(self, obj):
+        return ArtistSerializer(obj.album.artist).data
+
+    def get_audioUrl(self, obj):
+        """Get the audio URL from file or yt_id"""
+        if obj.file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.file.url)
+            return obj.file.url
+        return None
 
 
 class AlbumDetailSerializer(ModelSerializer):
@@ -73,10 +97,24 @@ class AlbumListSerializer(ModelSerializer):
 class TrackDetailSerializer(ModelSerializer):
     """Detailed track serializer with full album and artist info"""
     album = AlbumDetailSerializer()
+    artist = SerializerMethodField()
+    audioUrl = serializers.SerializerMethodField()
 
     class Meta:
         model = Track
         fields = "__all__"
+
+    def get_artist(self, obj):
+        return ArtistSerializer(obj.album.artist).data
+
+    def get_audioUrl(self, obj):
+        """Get the audio URL from file or yt_id"""
+        if obj.file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.file.url)
+            return obj.file.url
+        return None
 
 
 # =============================================================================
@@ -285,12 +323,53 @@ class ListeningHistorySerializer(ModelSerializer):
     album_cover = serializers.ImageField(source='track.album.cover', read_only=True)
     artist_slug = serializers.SlugField(source='track.album.artist.slug', read_only=True)
     album_slug = serializers.SlugField(source='track.album.slug', read_only=True)
+    track_file = serializers.FileField(source='track.file', read_only=True)
+    track_yt_id = serializers.CharField(source='track.yt_id', read_only=True)
 
     class Meta:
         model = ListeningHistory
         fields = ('id', 'track', 'track_title', 'track_duration', 'album_title',
                   'artist_name', 'album_cover', 'artist_slug', 'album_slug',
-                  'played_at', 'play_duration')
+                  'played_at', 'play_duration', 'track_file', 'track_yt_id')
+
+
+class UserStatsSerializer(serializers.Serializer):
+    """Serializer for user listening statistics"""
+
+    tracks_played = serializers.IntegerField(read_only=True)
+    hours_streamed = serializers.FloatField(read_only=True)
+    playlists_created = serializers.IntegerField(read_only=True)
+    artists_discovered = serializers.IntegerField(read_only=True)
+
+
+class SavedAlbumSerializer(ModelSerializer):
+    """Serializer for saved albums"""
+
+    album = AlbumDetailSerializer(read_only=True)
+
+    class Meta:
+        model = SavedAlbum
+        fields = ('id', 'album', 'created_at')
+
+
+class FollowedArtistSerializer(ModelSerializer):
+    """Serializer for followed artists"""
+
+    artist = ArtistDetailSerializer(read_only=True)
+
+    class Meta:
+        model = FollowedArtist
+        fields = ('id', 'artist', 'created_at')
+
+
+class FavoriteTrackSerializer(ModelSerializer):
+    """Serializer for favorite (liked) tracks"""
+
+    track = TrackDetailSerializer(read_only=True)
+
+    class Meta:
+        model = FavoriteTrack
+        fields = ('id', 'track', 'created_at')
 
 
 class UserSettingsSerializer(ModelSerializer):

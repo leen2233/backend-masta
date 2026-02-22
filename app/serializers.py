@@ -57,11 +57,11 @@ class TrackSerializer(ModelSerializer):
 
     def get_audioUrl(self, obj):
         """Get the audio URL from file or yt_id"""
-        if obj.file:
+        if obj.track_file:
             request = self.context.get('request')
             if request:
-                return request.build_absolute_uri(obj.file.url)
-            return obj.file.url
+                return request.build_absolute_uri(obj.track_file.url)
+            return obj.track_file.url
         return None
 
 
@@ -109,11 +109,11 @@ class TrackDetailSerializer(ModelSerializer):
 
     def get_audioUrl(self, obj):
         """Get the audio URL from file or yt_id"""
-        if obj.file:
+        if obj.track_file:
             request = self.context.get('request')
             if request:
-                return request.build_absolute_uri(obj.file.url)
-            return obj.file.url
+                return request.build_absolute_uri(obj.track_file.url)
+            return obj.track_file.url
         return None
 
 

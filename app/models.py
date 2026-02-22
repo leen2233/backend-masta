@@ -45,6 +45,7 @@ class EmailVerificationToken(models.Model):
             self.token = secrets.token_urlsafe(32)
         super().save(*args, **kwargs)
 
+    @property
     def is_valid(self):
         from django.utils import timezone
         return not self.is_used and timezone.now() < self.expires_at
@@ -75,6 +76,7 @@ class PasswordResetToken(models.Model):
             self.token = secrets.token_urlsafe(32)
         super().save(*args, **kwargs)
 
+    @property
     def is_valid(self):
         from django.utils import timezone
         return not self.is_used and timezone.now() < self.expires_at
@@ -97,27 +99,42 @@ class Genre(models.Model):
 
     def __str__(self):
         return self.name
+    
+    class Meta:
+        verbose_name = 'Genre'
+        verbose_name_plural = 'Genres'
 
 
 def artist_profile_picture_path(instance, filename):
     ext = filename.split('.')[-1]
-    return os.path.join("music", instance.name, f"folder.{ext}")
+    artist  = slugify(instance.name)
+    return os.path.join("music",artist , f"folder.{ext}")
 
 def artist_banner_path(instance, filename):
     ext = filename.split('.')[-1]
-    return os.path.join("music", instance.name, f"backdrop.{ext}")
+    artist  = slugify(instance.name)
+    return os.path.join("music", artist, f"backdrop.{ext}")
 
 def album_cover_path(instance, filename):
     ext = filename.split('.')[-1]
-    return os.path.join("music", instance.artist.name, instance.title, f"cover.{ext}")
+    artist = slugify(instance.artist.name)
+    album = slugify(instance.title)
+
+    return os.path.join("music", artist, album, f"cover.{ext}")
+
 
 def track_file_path(instance, filename):
     ext = filename.split('.')[-1]
+
+    artist_slug = slugify(instance.album.artist.name)
+    album_slug = slugify(instance.album.title)
+    track_slug = slugify(instance.title)
+
     return os.path.join(
-            "music",
-            instance.album.artist.name,
-            instance.album.title,
-            f"{instance.order}. {instance.title}.{ext}"
+        "music",
+        artist_slug,
+        album_slug,
+        f"{instance.order}-{track_slug}.{ext}"
     )
 
 
@@ -137,6 +154,9 @@ class Artist(models.Model):
     followers = models.IntegerField(default=0, blank=True, null=True)
     monthly_listeners = models.IntegerField(default=0, blank=True, null=True)
     verified = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     
     def save(self, *args, **kwargs):
         # generate slug only if not set
@@ -156,16 +176,18 @@ class Artist(models.Model):
 
 
 class Album(models.Model):
-    class Types(models.TextChoices):
-        SINGLE  = "single", "Single"
-        ALBUM   = "album", "Album"
-        EP      = "ep", "EP"
+    
+    type_list = [
+        ('single','Single'),
+        ("album", "Album"),
+        ("ep", "EP")
+    ]
 
     title = models.CharField(max_length=255)
     cover = models.ImageField(upload_to=album_cover_path, blank=True, null=True)
     track_count = models.IntegerField(default=0, blank=True, null=True)
     release_date = models.DateField(blank=True, null=True)
-    type = models.CharField(max_length=10, choices=Types.choices, default="album")
+    album_type = models.CharField(max_length=10, choices=type_list, default="album")
 
     slug = models.SlugField(blank=True, null=True)
     artist = models.ForeignKey(Artist, related_name="albums", on_delete=models.CASCADE)
@@ -187,7 +209,7 @@ class Album(models.Model):
 
     def __str__(self):
         if self.artist:
-            return f"{self.title} (" + self.artist.name + ")"
+            return f"{self.title} ({self.artist.name})"
         else:
             return f"{self.title}"
 
@@ -200,7 +222,7 @@ class Track(models.Model):
     featured_artists = models.ManyToManyField(Artist, blank=True)
 
     listens = models.IntegerField(default=0)
-    file = models.FileField(upload_to=track_file_path, blank=True, null=True)
+    track_file = models.FileField(upload_to=track_file_path, blank=True, null=True,max_length=500)
     yt_id = models.CharField(blank=True, null=True, max_length=255)
 
 

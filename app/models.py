@@ -225,7 +225,8 @@ class Track(models.Model):
     track_file = models.FileField(upload_to=track_file_path, blank=True, null=True,max_length=500)
     yt_id = models.CharField(blank=True, null=True, max_length=255)
 
-
+    def __str__(self):
+        return f"{self.title}"
 # =============================================================================
 # User Settings Models
 # =============================================================================

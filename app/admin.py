@@ -1,7 +1,9 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from .models import (Artist, Album, Track, Genre,
-                    UserProfile, EmailVerificationToken, PasswordResetToken)
+                    UserProfile, EmailVerificationToken, PasswordResetToken,
+                    UserPreferences, NotificationPreference, ListeningHistory,
+                    SavedAlbum, FollowedArtist,FavoriteTrack)
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
@@ -101,3 +103,41 @@ class TrackAdmin(admin.ModelAdmin):
     list_display_links = ['id','title']
     search_fields = ("title", "album__title", "album__artist__name")
 
+@admin.register(UserPreferences)
+class UserPreferencesAdmin(admin.ModelAdmin):
+    list_display = ['id','user__username','user__email','crossfade_duration','gapless_playback','private_account','show_activity_status','share_listening_history']
+    list_display_links = ['id','user__username']
+    search_fields = ['user__username','user__email']
+    list_filter = ['gapless_playback','private_account','show_activity_status','share_listening_history']
+
+@admin.register(NotificationPreference)
+class NotificationPreferenceAdmin(admin.ModelAdmin):
+    list_display = ['id','user__username','email_new_releases','email_recommendations','app_playlist_updates','app_friend_activity','app_concert_alerts']
+    list_display_links = ['id','user__username']
+    search_fields = ['user__username','user__email']
+    list_filter = ['email_new_releases','email_recommendations','app_playlist_updates','app_friend_activity','app_concert_alerts']
+
+
+@admin.register(ListeningHistory)
+class ListeningHistoryAdmin(admin.ModelAdmin):
+    list_display = ['id','user','track__title','played_at','play_duration']
+    list_display_links = ['id','user']
+    search_fields = ['user__username','user__email','track__title']
+
+@admin.register(SavedAlbum)
+class SavedAlbumAdmin(admin.ModelAdmin):
+    list_display = ['id','user','album','created_at']
+    list_display_links = ['id','user']
+    search_fields = ['id','user__username','user__email','album__title']
+
+@admin.register(FollowedArtist)
+class FollowedArtistAdmin(admin.ModelAdmin):
+    list_display = ['id','user','artist__name','created_at']
+    list_display_links = ['id','user']
+    search_fields = ['id','user__username','user__email','artist__name']
+
+@admin.register(FavoriteTrack)
+class FavoriteTrackAdmin(admin.ModelAdmin):
+    list_display = ['id', 'user','track__title','created_at']
+    list_display_links = ['id', 'user']
+    search_fields = ['id','user__username','user__email','track__title']

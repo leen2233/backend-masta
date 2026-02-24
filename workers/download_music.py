@@ -21,7 +21,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # get tracks with missing files
-tracks = Track.objects.filter(file="")
+tracks = Track.objects.filter(track_file="")
 logger.info(f"Found {tracks.count()} tracks with missing file")
 
 ydl_opts = {
@@ -60,7 +60,7 @@ for track in tracks:
 
         # save file
         with open(filepath, "rb") as f:
-            track.file.save(
+            track.track_file.save(
                 os.path.basename(filepath),
                 File(f),
                 save=True,
